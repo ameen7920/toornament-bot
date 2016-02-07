@@ -86,7 +86,7 @@ def setup(table):
     except ClientError as e:
         if e.response['Error']['Code'] != 'ResourceNotFoundException':
             raise
-        table = boto3.resource('dynamodb')(
+        table = boto3.resource('dynamodb').create_table(
             TableName=table.name,
             AttributeDefinitions=[
                 {
@@ -117,11 +117,11 @@ def setup(table):
                     'IndexName': 'telegram-chat-id',
                     'KeySchema': [
                         {
-                            'AttributeName': ATTR_TOURNAMENT,
+                            'AttributeName': ATTR_CHAT,
                             'KeyType': 'HASH',
                         },
                         {
-                            'AttributeName': ATTR_CHAT,
+                            'AttributeName': ATTR_TOURNAMENT,
                             'KeyType': 'RANGE',
                         },
                     ],

@@ -20,26 +20,7 @@ def lambda_handler(event, context):
     start = re.match(r'^/start( \w+)?$', text)
     if start:
         code = (start.group(1) or '').strip()
-        t = 'Well met!'
-        if code:
-            response = table.query(
-                IndexName='confirmation',
-                Select='ALL_PROJECTED_ATTRIBUTES',
-                KeyConditionExpression=Key('confirmation_code').eq(code)
-            )
-            count = response['Count']
-            if count > 1:
-                t = 'Shit happend! Confirmation code is not unique!'
-            elif count == 0:
-                t = 'Invalid confirmation code ' + code
-            else:
-                i = response['Items'][0]
-                table.update_item(
-                    Key={'participant_id': i['participant_id']},
-                    UpdateExpression='SET chat_id = :chat_id',
-                    ExpressionAttributeValues={':chat_id': chat_id}
-                )
-                t = 'Graz! You\'re in!'
+        t = start(code) if code else 'Well met!'
     elif text.startswith('/widget'):
         t = 'https://widget.toornament.com/tournaments/{id}/'.format(id=tid)
     elif text.startswith('/matches'):
@@ -48,6 +29,27 @@ def lambda_handler(event, context):
     if t:
         send_message(event['bot_token'], chat_id, t)
     return {'ok': True}
+
+
+def start(chat_id, code, table):
+    response = table.query(
+        IndexName=IDX_CODE,
+        Select='ALL_PROJECTED_ATTRIBUTES',
+        KeyConditionExpression=Key(ATTR_CODE).eq(code)
+    )
+    count = response['Count']
+    if count > 1:
+        return 'Shit happend! Confirmation code is not unique!'
+    elif count == 0:
+        return 'Invalid confirmation code ' + code
+    else:
+        i = response['Items'][0]
+        table.update_item(
+            Key={ATTR_PARTICIPANT: i[ATTR_PARTICIPANT]},
+            UpdateExpression='SET {k} = :chat_id'.format(k=ATTR_CHAT),
+            ExpressionAttributeValues={':chat_id': chat_id}
+        )
+        return 'Graz! You\'re in!'
 
 
 def get_matches(chat_id, api_key, table):

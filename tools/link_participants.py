@@ -5,11 +5,22 @@ import hmac
 
 import boto3
 import click
+from botocore.exceptions import ClientError
 
 from client import Client
 
 
-@click.command()
+@click.group()
+@click.option('--table', envvar='PARTICIPANTS_TABLE', help=(
+    'DynamoDB table to store participant-to-telegram linking. You can set '
+    'default value using PARTICIPANTS_TABLE env variable.'
+))
+@click.pass_context
+def cli(ctx, table):
+    ctx.obj = boto3.resource('dynamodb').Table(table)
+
+
+@cli.command()
 @click.argument('export-csv', type=click.File('rb'), required=False)
 @click.option('--bot-name', envvar='TELEGRAM_BOT_NAME', help=(
     'Telegram Bot name. More about bots here https://core.telegram.org/bots. '
@@ -25,21 +36,14 @@ from client import Client
     'https://www.toornament.com/admin/tournaments/. You can set default value '
     'using TOORNAMENT_ID env variable.'
 ))
-@click.option('--table', envvar='PARTICIPANTS_TABLE', help=(
-    'DynamoDB table to store participant-to-telegram linking. You can set '
-    'default value using PARTICIPANTS_TABLE env variable.'
-
-))
 @click.option('--secret', envvar='SECRET_KEY', prompt=True, hide_input=True, help=(
     'Secret key to use as salt for confirmation code. You can set default '
     'value using SECRET_KEY env variable.'
 ))
-def link(export_csv, bot_name, api_key, tournament_id, table, secret):
+@click.pass_obj
+def link(table, export_csv, bot_name, api_key, tournament_id, secret):
     emails = {row['Player/Team name'].decode('utf-8'): row['Player email']
               for row in csv.DictReader(export_csv)} if export_csv else {}
-
-    dynamodb = boto3.resource('dynamodb')
-    users = dynamodb.Table(table)
 
     for p in Client(api_key).list_participants(tournament_id):
         digest = hmac.new(key=str(secret), digestmod=hashlib.sha256)
@@ -48,7 +52,7 @@ def link(export_csv, bot_name, api_key, tournament_id, table, secret):
         code = digest.hexdigest()[:32]
 
         name = p['name']
-        users.put_item(Item={
+        table.put_item(Item={
             'participant_id': p['id'],
             'tournament_id': tournament_id,
             'name': name,
@@ -67,5 +71,93 @@ def start_url(bot, code):
     return 'https://telegram.me/{bot}?start={code}'.format(bot=bot, code=code)
 
 
+@cli.command()
+@click.pass_obj
+def setup(table):
+    try:
+        status = table.table_status
+        click.echo('Table {t} is {s}'.format(t=table.name, s=status))
+    except ClientError as e:
+        if e.response['Error']['Code'] != 'ResourceNotFoundException':
+            raise
+        table = boto3.resource('dynamodb')(
+            TableName=table.name,
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'participant_id',
+                    'AttributeType': 'S',
+                },
+                {
+                    'AttributeName': 'tournament_id',
+                    'AttributeType': 'S',
+                },
+                {
+                    'AttributeName': 'chat_id',
+                    'AttributeType': 'N',
+                },
+                {
+                    'AttributeName': 'confirmation_code',
+                    'AttributeType': 'S',
+                },
+            ],
+            KeySchema=[
+                {
+                    'AttributeName': 'participant_id',
+                    'KeyType': 'HASH',
+                }
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    'IndexName': 'telegram-chat-id',
+                    'KeySchema': [
+                        {
+                            'AttributeName': 'tournament_id',
+                            'KeyType': 'HASH',
+                        },
+                        {
+                            'AttributeName': 'chat_id',
+                            'KeyType': 'RANGE',
+                        },
+                    ],
+                    'Projection': {
+                        'ProjectionType': 'INCLUDE',
+                        'NonKeyAttributes': [
+                            'participant_id', 'tournament_id',
+                        ]
+                    },
+                    'ProvisionedThroughput': {
+                        'ReadCapacityUnits': 1,
+                        'WriteCapacityUnits': 1,
+                    }
+                },
+                {
+                    'IndexName': 'confirmation',
+                    'KeySchema': [
+                        {
+                            'AttributeName': 'confirmation_code',
+                            'KeyType': 'HASH',
+                        },
+                    ],
+                    'Projection': {
+                        'ProjectionType': 'INCLUDE',
+                        'NonKeyAttributes': [
+                            'participant_id', 'tournament_id',
+                        ]
+                    },
+                    'ProvisionedThroughput': {
+                        'ReadCapacityUnits': 1,
+                        'WriteCapacityUnits': 1,
+                    }
+                },
+            ],
+            ProvisionedThroughput={
+                'ReadCapacityUnits': 1,
+                'WriteCapacityUnits': 1,
+            },
+        )
+        table.meta.client.get_waiter('table_exists').wait(TableName=table.name)
+        click.echo('Table {t} {s}'.format(t=table.name, s=table.table_status))
+
+
 if __name__ == '__main__':
-    link()
+    cli(obj={})

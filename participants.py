@@ -7,7 +7,7 @@ import boto3
 import click
 from botocore.exceptions import ClientError
 
-from client import Client
+from app.client import Client
 
 
 ATTR_PARTICIPANT = 'participant_id'

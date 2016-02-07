@@ -46,7 +46,7 @@ def start(chat_id, code, table):
         table.update_item(
             Key={ATTR_PARTICIPANT: i[ATTR_PARTICIPANT]},
             UpdateExpression='SET {k} = :chat_id'.format(k=ATTR_CHAT),
-            ExpressionAttributeValues={':chat_id': chat_id}
+            ExpressionAttributeValues={':chat_id': int(chat_id)}
         )
         return 'Graz! You\'re in!'
 
@@ -70,5 +70,7 @@ def get_widgets(chat_id, table):
 def get_matches(chat_id, api_key, table):
     client = Client(api_key)
     for item in tournaments(chat_id, table):
-        for m in client.list_matches(item['tournament_id'], item[ATTR_TOURNAMENT]):
-            yield m
+        for m in client.list_matches(item[ATTR_TOURNAMENT], item[ATTR_PARTICIPANT]):
+            participants = [o['participant']['name'] for o in m['opponents'] if o['participant']]
+            if participants:
+                yield ' vs. '.join(participants) + ' - ' + m['status']

@@ -8,7 +8,7 @@ class Client(object):
         self.api_key = api_key
         assert self.api_key
 
-    def call(self, path, query):
+    def call(self, path, query=None):
         url = 'https://api.toornament.com/v1/{p}'.format(p=path.strip('/'))
         if query:
             url += '?' + urllib.urlencode(query)

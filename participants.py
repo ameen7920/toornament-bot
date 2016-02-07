@@ -9,23 +9,7 @@ from botocore.exceptions import ClientError
 
 from app.constants import *  # noqa
 from app.toornament import Client
-from app.function import get_matches
-
-
-@click.group()
-@click.option('--table', envvar='PARTICIPANTS_TABLE', help=(
-    'DynamoDB table to store participant-to-telegram linking. You can set '
-    'default value using PARTICIPANTS_TABLE env variable.'
-))
-@click.option('--api-key', envvar='TOORNAMENT_API_KEY', help=(
-    'API key for Toornament API. Create new Application on '
-    'https://developer.toornament.com/applications to obtain a key. You can '
-    'set default value using TOORNAMENT_API_KEY env variable.'
-))
-@click.pass_context
-def cli(ctx, table, api_key):
-    ctx.obj['table'] = boto3.resource('dynamodb').Table(table)
-    ctx.obj['api_key'] = api_key
+from cli.groups import cli
 
 
 @cli.command()
@@ -44,10 +28,11 @@ def cli(ctx, table, api_key):
     'value using SECRET_KEY env variable.'
 ))
 @click.pass_obj
-def link(ctx_obj, export_csv, bot_name, tournament_id, secret):
+def link(obj, export_csv, bot_name, tournament_id, secret):
     emails = {row['Player/Team name'].decode('utf-8'): row['Player email']
               for row in csv.DictReader(export_csv)} if export_csv else {}
 
+    api_key = obj['api_key']
     for p in Client(api_key).list_participants(tournament_id):
         digest = hmac.new(key=str(secret), digestmod=hashlib.sha256)
         digest.update(api_key)
@@ -55,7 +40,7 @@ def link(ctx_obj, export_csv, bot_name, tournament_id, secret):
         code = digest.hexdigest()[:32]
 
         name = p['name']
-        ctx_obj['table'].put_item(Item={
+        obj['table'].put_item(Item={
             ATTR_PARTICIPANT: p['id'],
             ATTR_TOURNAMENT: tournament_id,
             'name': name,
@@ -76,8 +61,8 @@ def start_url(bot, code):
 
 @cli.command()
 @click.pass_obj
-def setup(ctx_obj):
-    table = ctx_obj['table']
+def setup(obj):
+    table = obj['table']
     try:
         status = table.table_status
         click.echo('Table {t} is {s}'.format(t=table.name, s=status))
@@ -162,14 +147,6 @@ def setup(ctx_obj):
         table.meta.client.get_waiter('table_exists').wait(TableName=table.name)
         click.echo('Table {t} {s}'.format(t=table.name, s=table.table_status))
 
-
-@cli.command()
-@click.argument('chat-id')
-@click.pass_obj
-def matches(obj, chat_id):
-    res = get_matches(chat_id, obj['api_key'], obj['table'])
-    for m in res:
-        click.echo(m)
 
 if __name__ == '__main__':
     cli(obj={})

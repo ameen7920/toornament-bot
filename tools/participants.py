@@ -10,6 +10,11 @@ from botocore.exceptions import ClientError
 from client import Client
 
 
+ATTR_PID = 'participant_id'
+ATTR_TID = 'tournament_id'
+ATTR_CODE = 'confirmation_code'
+
+
 @click.group()
 @click.option('--table', envvar='PARTICIPANTS_TABLE', help=(
     'DynamoDB table to store participant-to-telegram linking. You can set '
@@ -53,10 +58,10 @@ def link(table, export_csv, bot_name, api_key, tournament_id, secret):
 
         name = p['name']
         table.put_item(Item={
-            'participant_id': p['id'],
-            'tournament_id': tournament_id,
+            ATTR_PID: p['id'],
+            ATTR_TID: tournament_id,
             'name': name,
-            'confirmation_code': code,
+            ATTR_CODE: code,
         })
         if name not in emails:
             msg = u'Unknown email for {u} share following link manually with this user'.format(u=name)
@@ -84,11 +89,11 @@ def setup(table):
             TableName=table.name,
             AttributeDefinitions=[
                 {
-                    'AttributeName': 'participant_id',
+                    'AttributeName': ATTR_PID,
                     'AttributeType': 'S',
                 },
                 {
-                    'AttributeName': 'tournament_id',
+                    'AttributeName': ATTR_TID,
                     'AttributeType': 'S',
                 },
                 {
@@ -96,13 +101,13 @@ def setup(table):
                     'AttributeType': 'N',
                 },
                 {
-                    'AttributeName': 'confirmation_code',
+                    'AttributeName': ATTR_CODE,
                     'AttributeType': 'S',
                 },
             ],
             KeySchema=[
                 {
-                    'AttributeName': 'participant_id',
+                    'AttributeName': ATTR_PID,
                     'KeyType': 'HASH',
                 }
             ],
@@ -111,7 +116,7 @@ def setup(table):
                     'IndexName': 'telegram-chat-id',
                     'KeySchema': [
                         {
-                            'AttributeName': 'tournament_id',
+                            'AttributeName': ATTR_TID,
                             'KeyType': 'HASH',
                         },
                         {
@@ -122,7 +127,7 @@ def setup(table):
                     'Projection': {
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
-                            'participant_id', 'tournament_id',
+                            ATTR_PID, ATTR_TID,
                         ]
                     },
                     'ProvisionedThroughput': {
@@ -134,14 +139,14 @@ def setup(table):
                     'IndexName': 'confirmation',
                     'KeySchema': [
                         {
-                            'AttributeName': 'confirmation_code',
+                            'AttributeName': ATTR_CODE,
                             'KeyType': 'HASH',
                         },
                     ],
                     'Projection': {
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
-                            'participant_id', 'tournament_id',
+                            ATTR_PID, ATTR_TID,
                         ]
                     },
                     'ProvisionedThroughput': {

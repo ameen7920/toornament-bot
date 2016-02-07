@@ -23,7 +23,7 @@ def lambda_handler(event, context):
     elif text.startswith('/widget'):
         t = get_widgets(chat_id, table)
     elif text.startswith('/matches'):
-        t = get_matches(event['api_key'], table)
+        t = get_matches(chat_id, event['api_key'], table)
 
     if t:
         send_message(event['bot_token'], chat_id, t)

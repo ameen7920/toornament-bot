@@ -19,7 +19,7 @@ def lambda_handler(event, context):
     start = re.match(r'^/start( \w+)?$', text)
     if start:
         code = (start.group(1) or '').strip()
-        t = start(code) if code else 'Well met!'
+        t = start(code, table) if code else 'Well met!'
     elif text.startswith('/widget'):
         t = get_widgets(chat_id, table)
     elif text.startswith('/matches'):

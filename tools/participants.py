@@ -10,8 +10,8 @@ from botocore.exceptions import ClientError
 from client import Client
 
 
-ATTR_PID = 'participant_id'
-ATTR_TID = 'tournament_id'
+ATTR_PARTICIPANT = 'participant_id'
+ATTR_TOURNAMENT = 'tournament_id'
 ATTR_CODE = 'confirmation_code'
 ATTR_CHAT = 'chat_id'
 
@@ -59,8 +59,8 @@ def link(table, export_csv, bot_name, api_key, tournament_id, secret):
 
         name = p['name']
         table.put_item(Item={
-            ATTR_PID: p['id'],
-            ATTR_TID: tournament_id,
+            ATTR_PARTICIPANT: p['id'],
+            ATTR_TOURNAMENT: tournament_id,
             'name': name,
             ATTR_CODE: code,
         })
@@ -90,11 +90,11 @@ def setup(table):
             TableName=table.name,
             AttributeDefinitions=[
                 {
-                    'AttributeName': ATTR_PID,
+                    'AttributeName': ATTR_PARTICIPANT,
                     'AttributeType': 'S',
                 },
                 {
-                    'AttributeName': ATTR_TID,
+                    'AttributeName': ATTR_TOURNAMENT,
                     'AttributeType': 'S',
                 },
                 {
@@ -108,7 +108,7 @@ def setup(table):
             ],
             KeySchema=[
                 {
-                    'AttributeName': ATTR_PID,
+                    'AttributeName': ATTR_PARTICIPANT,
                     'KeyType': 'HASH',
                 }
             ],
@@ -117,7 +117,7 @@ def setup(table):
                     'IndexName': 'telegram-chat-id',
                     'KeySchema': [
                         {
-                            'AttributeName': ATTR_TID,
+                            'AttributeName': ATTR_TOURNAMENT,
                             'KeyType': 'HASH',
                         },
                         {
@@ -128,7 +128,7 @@ def setup(table):
                     'Projection': {
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
-                            ATTR_PID, ATTR_TID,
+                            ATTR_PARTICIPANT, ATTR_TOURNAMENT,
                         ]
                     },
                     'ProvisionedThroughput': {
@@ -147,7 +147,7 @@ def setup(table):
                     'Projection': {
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
-                            ATTR_PID, ATTR_TID,
+                            ATTR_PARTICIPANT, ATTR_TOURNAMENT,
                         ]
                     },
                     'ProvisionedThroughput': {

@@ -10,7 +10,6 @@ from .toornament import Client
 
 
 def lambda_handler(event, context):
-    tid = event['tournament_id']
     table = boto3.resource('dynamodb').Table('players')
 
     message = event.get('message', {})
@@ -22,9 +21,9 @@ def lambda_handler(event, context):
         code = (start.group(1) or '').strip()
         t = start(code) if code else 'Well met!'
     elif text.startswith('/widget'):
-        t = 'https://widget.toornament.com/tournaments/{id}/'.format(id=tid)
+        t = get_widgets(chat_id, table)
     elif text.startswith('/matches'):
-        t = '\n'.join([m for m in get_matches(event['api_key'], table)])
+        t = get_matches(event['api_key'], table)
 
     if t:
         send_message(event['bot_token'], chat_id, t)
@@ -52,13 +51,24 @@ def start(chat_id, code, table):
         return 'Graz! You\'re in!'
 
 
-def get_matches(chat_id, api_key, table):
+def tournaments(chat_id, table):
     response = table.query(
         IndexName=IDX_CHAT,
         Select='ALL_PROJECTED_ATTRIBUTES',
         KeyConditionExpression=Key(ATTR_CHAT).eq(int(chat_id))
     )
-    client = Client(api_key)
     for item in response['Items']:
-        for m in client.list_matches(item['tournament_id'], item['participant_id']):
+        yield item
+
+
+def get_widgets(chat_id, table):
+    for item in tournaments(chat_id, table):
+        yield 'https://widget.toornament.com/tournaments/{id}/'.format(
+            id=item[ATTR_TOURNAMENT])
+
+
+def get_matches(chat_id, api_key, table):
+    client = Client(api_key)
+    for item in tournaments(chat_id, table):
+        for m in client.list_matches(item['tournament_id'], item[ATTR_TOURNAMENT]):
             yield m

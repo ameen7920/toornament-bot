@@ -110,7 +110,7 @@ def setup(table):
                 {
                     'AttributeName': ATTR_PARTICIPANT,
                     'KeyType': 'HASH',
-                }
+                },
             ],
             GlobalSecondaryIndexes=[
                 {
@@ -129,12 +129,12 @@ def setup(table):
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
                             ATTR_PARTICIPANT, ATTR_TOURNAMENT,
-                        ]
+                        ],
                     },
                     'ProvisionedThroughput': {
                         'ReadCapacityUnits': 1,
                         'WriteCapacityUnits': 1,
-                    }
+                    },
                 },
                 {
                     'IndexName': 'confirmation',
@@ -148,12 +148,12 @@ def setup(table):
                         'ProjectionType': 'INCLUDE',
                         'NonKeyAttributes': [
                             ATTR_PARTICIPANT, ATTR_TOURNAMENT,
-                        ]
+                        ],
                     },
                     'ProvisionedThroughput': {
                         'ReadCapacityUnits': 1,
                         'WriteCapacityUnits': 1,
-                    }
+                    },
                 },
             ],
             ProvisionedThroughput={

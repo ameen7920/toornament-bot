@@ -7,13 +7,9 @@ import boto3
 import click
 from botocore.exceptions import ClientError
 
-from app.client import Client
-
-
-ATTR_PARTICIPANT = 'participant_id'
-ATTR_TOURNAMENT = 'tournament_id'
-ATTR_CODE = 'confirmation_code'
-ATTR_CHAT = 'chat_id'
+from app.constants import *  # noqa
+from app.toornament import Client
+from app.function import get_matches
 
 
 @click.group()
@@ -21,9 +17,15 @@ ATTR_CHAT = 'chat_id'
     'DynamoDB table to store participant-to-telegram linking. You can set '
     'default value using PARTICIPANTS_TABLE env variable.'
 ))
+@click.option('--api-key', envvar='TOORNAMENT_API_KEY', help=(
+    'API key for Toornament API. Create new Application on '
+    'https://developer.toornament.com/applications to obtain a key. You can '
+    'set default value using TOORNAMENT_API_KEY env variable.'
+))
 @click.pass_context
-def cli(ctx, table):
-    ctx.obj = boto3.resource('dynamodb').Table(table)
+def cli(ctx, table, api_key):
+    ctx.obj['table'] = boto3.resource('dynamodb').Table(table)
+    ctx.obj['api_key'] = api_key
 
 
 @cli.command()
@@ -31,11 +33,6 @@ def cli(ctx, table):
 @click.option('--bot-name', envvar='TELEGRAM_BOT_NAME', help=(
     'Telegram Bot name. More about bots here https://core.telegram.org/bots. '
     'You can set default value using TELEGRAM_BOT_NAME env variable.'
-))
-@click.option('--api-key', envvar='TOORNAMENT_API_KEY', help=(
-    'API key for Toornament API. Create new Application on '
-    'https://developer.toornament.com/applications to obtain a key. You can '
-    'set default value using TOORNAMENT_API_KEY env variable.'
 ))
 @click.option('--tournament-id', envvar='TOORNAMENT_ID', help=(
     'Your tournament ID. Get it from url while browsing '
@@ -47,7 +44,7 @@ def cli(ctx, table):
     'value using SECRET_KEY env variable.'
 ))
 @click.pass_obj
-def link(table, export_csv, bot_name, api_key, tournament_id, secret):
+def link(ctx_obj, export_csv, bot_name, tournament_id, secret):
     emails = {row['Player/Team name'].decode('utf-8'): row['Player email']
               for row in csv.DictReader(export_csv)} if export_csv else {}
 
@@ -58,7 +55,7 @@ def link(table, export_csv, bot_name, api_key, tournament_id, secret):
         code = digest.hexdigest()[:32]
 
         name = p['name']
-        table.put_item(Item={
+        ctx_obj['table'].put_item(Item={
             ATTR_PARTICIPANT: p['id'],
             ATTR_TOURNAMENT: tournament_id,
             'name': name,
@@ -79,7 +76,8 @@ def start_url(bot, code):
 
 @cli.command()
 @click.pass_obj
-def setup(table):
+def setup(ctx_obj):
+    table = ctx_obj['table']
     try:
         status = table.table_status
         click.echo('Table {t} is {s}'.format(t=table.name, s=status))
@@ -114,7 +112,7 @@ def setup(table):
             ],
             GlobalSecondaryIndexes=[
                 {
-                    'IndexName': 'telegram-chat-id',
+                    'IndexName': IDX_CHAT,
                     'KeySchema': [
                         {
                             'AttributeName': ATTR_CHAT,
@@ -137,7 +135,7 @@ def setup(table):
                     },
                 },
                 {
-                    'IndexName': 'confirmation',
+                    'IndexName': IDX_CODE,
                     'KeySchema': [
                         {
                             'AttributeName': ATTR_CODE,
@@ -164,6 +162,14 @@ def setup(table):
         table.meta.client.get_waiter('table_exists').wait(TableName=table.name)
         click.echo('Table {t} {s}'.format(t=table.name, s=table.table_status))
 
+
+@cli.command()
+@click.argument('chat-id')
+@click.pass_obj
+def matches(obj, chat_id):
+    res = get_matches(chat_id, obj['api_key'], obj['table'])
+    for m in res:
+        click.echo(m)
 
 if __name__ == '__main__':
     cli(obj={})

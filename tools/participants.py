@@ -13,6 +13,7 @@ from client import Client
 ATTR_PID = 'participant_id'
 ATTR_TID = 'tournament_id'
 ATTR_CODE = 'confirmation_code'
+ATTR_CHAT = 'chat_id'
 
 
 @click.group()
@@ -97,7 +98,7 @@ def setup(table):
                     'AttributeType': 'S',
                 },
                 {
-                    'AttributeName': 'chat_id',
+                    'AttributeName': ATTR_CHAT,
                     'AttributeType': 'N',
                 },
                 {
@@ -120,7 +121,7 @@ def setup(table):
                             'KeyType': 'HASH',
                         },
                         {
-                            'AttributeName': 'chat_id',
+                            'AttributeName': ATTR_CHAT,
                             'KeyType': 'RANGE',
                         },
                     ],
